@@ -1,124 +1,193 @@
 /**
- * Mental Health Classifier - 100% Browser Based
- * Tidak perlu API, tidak ada CORS issue
- * Semua processing di browser user
+ * Mental Health Classifier Frontend
+ * Real-time integration with Hugging Face API
  */
 
-// Configuration - Semua data di local
 const CONFIG = {
-    // Label klasifikasi
+    API_URL: '/api/predict',
+    MODEL_NAME: 'B1NT4N9/roberta-mental-health-id',
+    
     LABELS: ["Normal", "Anxiety", "Depression", "Bipolar", "Suicidal"],
     
-    // Informasi tiap label
-    LABEL_INFO: {
+    LABEL_CONFIG: {
         "Normal": {
             icon: "bi-emoji-smile",
             color: "success",
-            bgColor: "#4cc9f0",
-            description: "Teks menunjukkan keadaan mental yang stabil dan sehat.",
-            keywords: ['baik', 'senang', 'bahagia', 'puas', 'normal', 'sehat', 'stabil', 'gembira', 'ceria']
+            description: "Kondisi mental stabil dan sehat",
+            emoji: "😊"
         },
         "Anxiety": {
             icon: "bi-emoji-expressionless",
             color: "warning",
-            bgColor: "#f8961e",
-            description: "Terdapat indikasi kecemasan atau kekhawatiran berlebihan.",
-            keywords: ['cemas', 'khawatir', 'takut', 'gelisah', 'panic', 'gugup', 'nervous', 'deg-degan', 'was-was']
+            description: "Indikasi kecemasan atau kekhawatiran",
+            emoji: "😟"
         },
         "Depression": {
             icon: "bi-emoji-frown",
             color: "danger",
-            bgColor: "#f72585",
-            description: "Terdapat tanda-tanda depresi atau perasaan sedih mendalam.",
-            keywords: ['sedih', 'depresi', 'putus asa', 'hampa', 'lelah', 'tidak berguna', 'malah', 'tertekan', 'murung']
+            description: "Tanda-tanda depresi atau kesedihan",
+            emoji: "😔"
         },
         "Bipolar": {
             icon: "bi-emoji-dizzy",
             color: "info",
-            bgColor: "#7209b7",
-            description: "Terdapat fluktuasi mood yang signifikan.",
-            keywords: ['naik turun', 'mood swing', 'euforia', 'marah', 'impulsif', 'berubah-ubah', 'ekstrim', 'meledak']
+            description: "Fluktuasi mood yang signifikan",
+            emoji: "😵"
         },
         "Suicidal": {
             icon: "bi-emoji-angry",
             color: "dark",
-            bgColor: "#212529",
-            description: "Terdapat pemikiran atau isyarat tentang bunuh diri.",
-            keywords: ['mati', 'bunuh diri', 'ending', 'habis', 'sakit hati', 'putus asa total', 'mengakhiri']
+            description: "Pemikiran atau isyarat bunuh diri",
+            emoji: "😠"
         }
-    },
-    
-    // Positive words yang meningkatkan skor Normal
-    POSITIVE_WORDS: [
-        'bahagia', 'senang', 'gembira', 'ceria', 'puas', 'bangga', 
-        'bersemangat', 'optimis', 'baik', 'hebat', 'luar biasa',
-        'terima kasih', 'syukur', 'bersyukur', 'alhamdulillah'
-    ],
-    
-    // Negative words yang menurunkan skor Normal
-    NEGATIVE_WORDS: [
-        'sedih', 'kecewa', 'marah', 'kesal', 'frustasi', 'stress',
-        'tertekan', 'lelah', 'capek', 'bosan', 'jenuh', 'kesepian'
-    ]
+    }
 };
 
-// Global State
-let currentSensitivity = 5; // 1-10
+// Application state
+let state = {
+    apiConnected: false,
+    isProcessing: false,
+    lastResult: null,
+    retryCount: 0
+};
 
-// DOM Elements
-const elements = {
+// DOM elements
+const dom = {
+    // Status
+    statusBadge: document.getElementById('statusBadge'),
+    connectionStatus: document.getElementById('connectionStatus'),
+    
+    // Input
     inputText: document.getElementById('inputText'),
     analyzeBtn: document.getElementById('analyzeBtn'),
     charCount: document.getElementById('charCount'),
-    sensitivitySlider: document.getElementById('sensitivitySlider'),
-    sensitivityValue: document.getElementById('sensitivityValue'),
-    loadingIndicator: document.getElementById('loadingIndicator'),
-    resultsArea: document.getElementById('resultsArea'),
+    
+    // Results
+    loadingState: document.getElementById('loadingState'),
+    resultsContainer: document.getElementById('resultsContainer'),
+    emptyState: document.getElementById('emptyState'),
     topResult: document.getElementById('topResult'),
     allResults: document.getElementById('allResults'),
-    emptyState: document.getElementById('emptyState'),
-    topIcon: document.getElementById('topIcon'),
+    
+    // Prediction displays
     topLabel: document.getElementById('topLabel'),
+    topPercent: document.getElementById('topPercent'),
     topBar: document.getElementById('topBar'),
     topDesc: document.getElementById('topDesc'),
-    resultsList: document.getElementById('resultsList'),
-    statusBadge: document.getElementById('statusBadge'),
-    modeIndicator: document.getElementById('modeIndicator')
+    predictionsList: document.getElementById('predictionsList'),
+    
+    // Info
+    modelInfo: document.getElementById('modelInfo'),
+    processingTime: document.getElementById('processingTime')
 };
 
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', function() {
-    console.log('🚀 Mental Health Classifier Initialized');
+// Initialize application
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('🧠 Mental Health Classifier Initializing...');
     
-    // Setup event listeners
     setupEventListeners();
-    
-    // Update initial UI
     updateCharCount();
-    updateSensitivityValue();
+    checkApiConnection();
     
-    // Set mode indicator
-    elements.modeIndicator.textContent = "Local Processing";
-    elements.modeIndicator.className = "badge bg-success";
+    // Set default model info
+    dom.modelInfo.textContent = CONFIG.MODEL_NAME;
     
-    // Set status
-    elements.statusBadge.innerHTML = '<i class="bi bi-check-circle"></i> READY';
-    elements.statusBadge.className = 'badge bg-success';
-    
-    console.log('✅ System ready - No API needed');
+    console.log('✅ Frontend initialized');
 });
 
-// Setup all event listeners
+// Check API connection
+async function checkApiConnection() {
+    try {
+        updateStatus('checking', 'Connecting to AI Model...');
+        
+        const response = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ test: true })
+        });
+        
+        if (response.ok) {
+            const data = await response.json();
+            state.apiConnected = true;
+            state.retryCount = 0;
+            
+            updateStatus('connected', 'AI Model Ready');
+            
+            console.log('✅ API connected:', data);
+            showNotification('Model AI terhubung dan siap digunakan', 'success');
+            
+        } else {
+            throw new Error('API not responding');
+        }
+        
+    } catch (error) {
+        console.warn('⚠️ API connection failed:', error);
+        state.apiConnected = false;
+        
+        updateStatus('offline', 'Using Local Analysis');
+        
+        showNotification(
+            'Menggunakan analisis lokal (AI Model sedang dimuat)',
+            'warning'
+        );
+        
+        // Auto retry after 10 seconds
+        setTimeout(checkApiConnection, 10000);
+    }
+}
+
+// Update status display
+function updateStatus(status, message) {
+    const badge = dom.statusBadge;
+    const connection = dom.connectionStatus;
+    
+    switch(status) {
+        case 'checking':
+            badge.innerHTML = `<span class="badge bg-warning">
+                <i class="bi bi-hourglass-split"></i> ${message}
+            </span>`;
+            connection.innerHTML = `<span class="badge bg-secondary">
+                <i class="bi bi-wifi"></i> Connecting...
+            </span>`;
+            break;
+            
+        case 'connected':
+            badge.innerHTML = `<span class="badge bg-success">
+                <i class="bi bi-check-circle"></i> ${message}
+            </span>`;
+            connection.innerHTML = `<span class="badge bg-success">
+                <i class="bi bi-wifi"></i> Online
+            </span>`;
+            break;
+            
+        case 'offline':
+            badge.innerHTML = `<span class="badge bg-warning">
+                <i class="bi bi-pc-display"></i> ${message}
+            </span>`;
+            connection.innerHTML = `<span class="badge bg-secondary">
+                <i class="bi bi-wifi-off"></i> Local Mode
+            </span>`;
+            break;
+            
+        case 'error':
+            badge.innerHTML = `<span class="badge bg-danger">
+                <i class="bi bi-exclamation-triangle"></i> ${message}
+            </span>`;
+            break;
+    }
+}
+
+// Setup event listeners
 function setupEventListeners() {
-    // Input text change
-    elements.inputText.addEventListener('input', updateCharCount);
+    // Text input
+    dom.inputText.addEventListener('input', updateCharCount);
     
-    // Sensitivity slider
-    elements.sensitivitySlider.addEventListener('input', updateSensitivityValue);
+    // Analyze button
+    dom.analyzeBtn.addEventListener('click', analyzeText);
     
-    // Enter key to analyze
-    elements.inputText.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && e.ctrlKey) {
+    // Enter key support
+    dom.inputText.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && e.ctrlKey && !state.isProcessing) {
             e.preventDefault();
             analyzeText();
         }
@@ -127,288 +196,290 @@ function setupEventListeners() {
 
 // Update character count
 function updateCharCount() {
-    const text = elements.inputText.value;
+    const text = dom.inputText.value;
     const count = text.length;
-    elements.charCount.textContent = count;
+    dom.charCount.textContent = count;
     
-    // Enable/disable button based on length
-    elements.analyzeBtn.disabled = count < 10;
+    // Enable/disable button
+    dom.analyzeBtn.disabled = count < 10 || state.isProcessing;
     
-    // Color coding
-    if (count < 10) {
-        elements.charCount.style.color = '#dc3545';
-    } else if (count < 50) {
-        elements.charCount.style.color = '#fd7e14';
+    // Update button text based on connection
+    if (state.apiConnected) {
+        dom.analyzeBtn.innerHTML = `<i class="bi bi-robot"></i> Analyze with AI Model`;
     } else {
-        elements.charCount.style.color = '#198754';
+        dom.analyzeBtn.innerHTML = `<i class="bi bi-cpu"></i> Analyze Locally`;
     }
-}
-
-// Update sensitivity value display
-function updateSensitivityValue() {
-    currentSensitivity = parseInt(elements.sensitivitySlider.value);
-    elements.sensitivityValue.textContent = currentSensitivity;
 }
 
 // Load example text
 function loadExample(type) {
     const examples = {
-        normal: "Hari ini saya merasa sangat bahagia. Pagi ini saya bangun dengan perasaan segar dan bersemangat. Saya berhasil menyelesaikan semua pekerjaan tepat waktu dan bahkan punya waktu untuk berolahraga. Malam ini saya akan makan malam bersama keluarga.",
+        normal: "Hari ini adalah hari yang indah. Saya bangun dengan perasaan segar dan bersemangat. Berhasil menyelesaikan semua tugas kerja tepat waktu, dan nanti malam akan berkumpul dengan keluarga. Semua berjalan dengan baik.",
         
-        anxiety: "Saya tidak bisa berhenti merasa cemas tentang presentasi besok. Jantung saya berdebar-debar sejak pagi. Pikiran saya terus membayangkan semua hal buruk yang mungkin terjadi. Saya takut akan gagal dan dipermalukan di depan semua orang. Tidak bisa tidur semalaman.",
+        anxiety: "Saya tidak bisa berhenti merasa cemas tentang masa depan. Pikiran terus menerus memikirkan hal-hal buruk yang mungkin terjadi. Jantung berdebar-debar setiap kali memikirkan presentasi besok. Rasanya seperti ada yang mengikat dada saya.",
         
-        depression: "Sudah dua minggu saya merasa sangat sedih dan hampa. Tidak ada yang membuat saya senang lagi. Saya hanya ingin tidur sepanjang hari. Rasanya hidup ini tidak ada artinya. Semua terasa berat dan melelahkan. Tidak punya energi untuk melakukan apapun."
+        depression: "Sudah beberapa minggu ini rasanya semua warna telah memudar dari hidup saya. Tidak ada yang membawa kebahagiaan lagi. Setiap bangun pagi terasa seperti beban berat. Hanya ingin tidur dan tidak bangun lagi.",
+        
+        bipolar: "Kadang saya merasa seperti superman - penuh energi, ide-ide brilian, bisa bekerja 48 jam tanpa tidur. Tapi kemudian tiba-tiba jatuh ke lubang yang dalam. Marah tanpa alasan, menangis tanpa sebab. Seperti ada dua orang berbeda dalam diri saya.",
+        
+        suicidal: "Saya lelah dengan semua ini. Setiap hari adalah penderitaan yang sama. Terkadang berpikir, apa gunanya terus bertahan? Mungkin lebih baik mengakhiri semuanya. Tidak ada yang akan merindukan saya."
     };
     
-    elements.inputText.value = examples[type] || examples.normal;
+    dom.inputText.value = examples[type] || examples.normal;
     updateCharCount();
-    elements.inputText.focus();
+    dom.inputText.focus();
 }
 
-// Main analysis function - 100% in browser
-function analyzeText() {
-    const text = elements.inputText.value.trim();
+// Main analysis function
+async function analyzeText() {
+    const text = dom.inputText.value.trim();
     
     // Validation
     if (text.length < 10) {
-        showAlert('Teks terlalu pendek. Minimal 10 karakter.', 'warning');
+        showNotification('Teks terlalu pendek. Minimal 10 karakter.', 'warning');
         return;
     }
     
-    if (text.length > 1000) {
-        showAlert('Teks terlalu panjang. Maksimal 1000 karakter.', 'warning');
+    if (text.length > 2000) {
+        showNotification('Teks terlalu panjang. Maksimal 2000 karakter.', 'warning');
         return;
     }
     
-    // Show loading
-    showLoading(true);
+    // Set processing state
+    setProcessing(true);
     
-    // Simulate processing delay (bukan API call)
-    setTimeout(() => {
-        try {
-            // Generate predictions locally
-            const predictions = generatePredictions(text);
-            
-            // Display results
-            displayResults(predictions);
-            
-            // Show success
-            showAlert('Analisis berhasil!', 'success');
-            
-        } catch (error) {
-            console.error('Analysis error:', error);
-            showAlert('Terjadi kesalahan dalam analisis.', 'danger');
-        } finally {
-            // Hide loading
-            showLoading(false);
-        }
-    }, 800); // Delay untuk efek loading
-}
-
-// Generate predictions locally (no API needed)
-function generatePredictions(text) {
-    const textLower = text.toLowerCase();
-    
-    // Base scores
-    let scores = {
-        "Normal": 0.4,    // Higher base for normal
-        "Anxiety": 0.15,
-        "Depression": 0.15,
-        "Bipolar": 0.15,
-        "Suicidal": 0.15
-    };
-    
-    // Analyze text for each category
-    for (const [label, info] of Object.entries(CONFIG.LABEL_INFO)) {
-        let keywordCount = 0;
+    try {
+        const startTime = Date.now();
         
-        // Count keyword matches
-        info.keywords.forEach(keyword => {
-            if (textLower.includes(keyword)) {
-                keywordCount++;
-            }
+        // Call our API
+        const response = await fetch(CONFIG.API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ text: text })
         });
         
-        // Adjust score based on keywords found
-        if (keywordCount > 0) {
-            if (label === 'Normal') {
-                scores[label] += keywordCount * 0.08;
-            } else {
-                scores[label] += keywordCount * 0.1;
-            }
+        const processingTime = ((Date.now() - startTime) / 1000).toFixed(2);
+        dom.processingTime.textContent = `${processingTime}s`;
+        
+        if (!response.ok) {
+            throw new Error(`API error: ${response.status}`);
         }
+        
+        const data = await response.json();
+        
+        if (!data.success && !data.fallback) {
+            throw new Error('Analysis failed');
+        }
+        
+        // Display results
+        displayResults(data.predictions, data.fallback || false);
+        
+        // Show success notification
+        if (data.fallback) {
+            showNotification('Menggunakan analisis lokal (AI Model sedang dimuat)', 'info');
+        } else {
+            showNotification('Analisis AI berhasil!', 'success');
+        }
+        
+        // Reset retry count on success
+        state.retryCount = 0;
+        
+    } catch (error) {
+        console.error('Analysis error:', error);
+        state.retryCount++;
+        
+        // Use local fallback
+        const fallbackPredictions = generateLocalPredictions(text);
+        displayResults(fallbackPredictions, true);
+        
+        showNotification('Menggunakan analisis lokal', 'warning');
+        
+        // Auto-retry connection
+        if (state.retryCount < 3) {
+            setTimeout(checkApiConnection, 5000);
+        }
+        
+    } finally {
+        setProcessing(false);
     }
-    
-    // Check for positive/negative words
-    let positiveCount = 0;
-    let negativeCount = 0;
-    
-    CONFIG.POSITIVE_WORDS.forEach(word => {
-        if (textLower.includes(word)) positiveCount++;
-    });
-    
-    CONFIG.NEGATIVE_WORDS.forEach(word => {
-        if (textLower.includes(word)) negativeCount++;
-    });
-    
-    // Adjust based on sentiment
-    if (positiveCount > negativeCount) {
-        scores.Normal += positiveCount * 0.05;
-    } else if (negativeCount > positiveCount) {
-        scores.Normal -= negativeCount * 0.03;
-        scores.Depression += negativeCount * 0.04;
-        scores.Anxiety += negativeCount * 0.03;
-    }
-    
-    // Apply sensitivity setting (1-10 scale to 0.1-2.0 multiplier)
-    const sensitivityMultiplier = 0.1 + (currentSensitivity * 0.19); // 0.1 to 2.0
-    scores.Normal *= sensitivityMultiplier;
-    
-    // Ensure no negative scores
-    Object.keys(scores).forEach(key => {
-        scores[key] = Math.max(0.01, scores[key]);
-    });
-    
-    // Normalize to sum to 1
-    const total = Object.values(scores).reduce((a, b) => a + b, 0);
-    Object.keys(scores).forEach(key => {
-        scores[key] = scores[key] / total;
-    });
-    
-    // Convert to prediction objects
-    const predictions = CONFIG.LABELS.map(label => ({
-        label: label,
-        score: scores[label],
-        percentage: Math.round(scores[label] * 10000) / 100
-    }));
-    
-    // Sort by score (descending)
-    predictions.sort((a, b) => b.score - a.score);
-    
-    return predictions;
 }
 
 // Display results
-function displayResults(predictions) {
-    const topPrediction = predictions[0];
-    const labelInfo = CONFIG.LABEL_INFO[topPrediction.label];
-    
+function displayResults(predictions, isFallback = false) {
     // Hide empty state
-    elements.emptyState.style.display = 'none';
+    dom.emptyState.style.display = 'none';
     
-    // Show top result
-    elements.topIcon.className = `bi ${labelInfo.icon} display-4 text-${labelInfo.color}`;
-    elements.topLabel.textContent = topPrediction.label;
-    elements.topLabel.className = `fw-bold text-${labelInfo.color}`;
-    elements.topBar.className = `progress-bar bg-${labelInfo.color}`;
-    elements.topBar.style.width = `${topPrediction.percentage}%`;
-    elements.topBar.textContent = `${topPrediction.percentage}%`;
-    elements.topDesc.textContent = labelInfo.description;
+    // Get top prediction
+    const topPrediction = predictions[0];
+    const config = CONFIG.LABEL_CONFIG[topPrediction.label] || CONFIG.LABEL_CONFIG.Normal;
     
-    elements.topResult.style.display = 'block';
+    // Update top result
+    dom.topLabel.textContent = topPrediction.label;
+    dom.topLabel.className = `text-${config.color} fw-bold`;
+    dom.topPercent.textContent = `${topPrediction.percentage}%`;
+    dom.topBar.className = `progress-bar bg-${config.color}`;
+    dom.topBar.style.width = `${topPrediction.percentage}%`;
+    dom.topDesc.textContent = config.description;
     
-    // Show all results
-    displayAllResults(predictions);
-    elements.allResults.style.display = 'block';
+    dom.topResult.style.display = 'block';
+    
+    // Update all predictions
+    displayAllPredictions(predictions);
+    dom.allResults.style.display = 'block';
+    
+    // Add fallback indicator
+    if (isFallback) {
+        dom.resultsContainer.insertAdjacentHTML('beforeend',
+            `<div class="alert alert-info mt-3">
+                <i class="bi bi-info-circle"></i>
+                <small>Menggunakan analisis lokal. AI Model akan aktif secara otomatis.</small>
+            </div>`
+        );
+    }
 }
 
 // Display all predictions
-function displayAllResults(predictions) {
-    elements.resultsList.innerHTML = '';
+function displayAllPredictions(predictions) {
+    dom.predictionsList.innerHTML = '';
     
     predictions.forEach((pred, index) => {
-        const info = CONFIG.LABEL_INFO[pred.label];
+        const config = CONFIG.LABEL_CONFIG[pred.label] || CONFIG.LABEL_CONFIG.Normal;
         const isTop = index === 0;
         
-        const item = document.createElement('div');
-        item.className = `prediction-item ${pred.label.toLowerCase()} ${isTop ? 'border-primary' : ''}`;
-        item.style.borderLeftColor = info.bgColor;
+        const predictionElement = document.createElement('div');
+        predictionElement.className = `prediction-item ${isTop ? 'border-primary' : ''} mb-2 p-3 rounded`;
+        predictionElement.style.borderLeft = `4px solid var(--bs-${config.color})`;
+        predictionElement.style.background = isTop ? `var(--bs-${config.color}-bg-subtle)` : 'white';
         
-        if (isTop) {
-            item.style.background = `${info.bgColor}15`;
-        }
-        
-        item.innerHTML = `
+        predictionElement.innerHTML = `
             <div class="row align-items-center">
-                <div class="col-2 text-center">
-                    <i class="bi ${info.icon} fs-4 text-${info.color}"></i>
-                </div>
-                <div class="col-5">
-                    <strong class="text-${info.color}">${pred.label}</strong>
+                <div class="col-1">
+                    <span class="badge bg-${config.color}">${index + 1}</span>
                 </div>
                 <div class="col-3">
+                    <div class="d-flex align-items-center">
+                        <i class="bi ${config.icon} text-${config.color} fs-5 me-2"></i>
+                        <strong>${pred.label}</strong>
+                    </div>
+                </div>
+                <div class="col-5">
                     <div class="progress" style="height: 10px;">
-                        <div class="progress-bar bg-${info.color}" 
+                        <div class="progress-bar bg-${config.color}" 
                              style="width: ${pred.percentage}%">
                         </div>
                     </div>
                 </div>
-                <div class="col-2 text-end">
-                    <span class="fw-bold">${pred.percentage}%</span>
+                <div class="col-3 text-end">
+                    <span class="fw-bold fs-5">${pred.percentage}%</span>
+                    <br>
+                    <small class="text-muted">confidence: ${pred.confidence || 'medium'}</small>
                 </div>
             </div>
         `;
         
-        elements.resultsList.appendChild(item);
+        dom.predictionsList.appendChild(predictionElement);
     });
 }
 
-// Show/hide loading indicator
-function showLoading(show) {
-    if (show) {
-        elements.loadingIndicator.style.display = 'block';
-        elements.resultsArea.style.opacity = '0.5';
-        elements.analyzeBtn.disabled = true;
-        elements.analyzeBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+// Local fallback prediction generator
+function generateLocalPredictions(text) {
+    const textLower = text.toLowerCase();
+    
+    // Simple keyword matching
+    const keywordScores = {
+        "Normal": { words: ['baik', 'senang', 'bahagia', 'puas', 'normal'], score: 0.4 },
+        "Anxiety": { words: ['cemas', 'khawatir', 'takut', 'gelisah'], score: 0.2 },
+        "Depression": { words: ['sedih', 'depresi', 'putus asa', 'hampa'], score: 0.2 },
+        "Bipolar": { words: ['naik turun', 'mood swing', 'euforia'], score: 0.1 },
+        "Suicidal": { words: ['mati', 'bunuh diri', 'ending'], score: 0.1 }
+    };
+    
+    // Calculate scores
+    let scores = {};
+    Object.entries(keywordScores).forEach(([label, config]) => {
+        let baseScore = config.score;
+        config.words.forEach(word => {
+            if (textLower.includes(word)) {
+                baseScore += 0.1;
+            }
+        });
+        scores[label] = baseScore;
+    });
+    
+    // Normalize
+    const total = Object.values(scores).reduce((a, b) => a + b, 0);
+    
+    return Object.entries(scores).map(([label, score]) => ({
+        label: label,
+        score: score / total,
+        percentage: Math.round((score / total) * 10000) / 100,
+        confidence: 'medium',
+        is_fallback: true
+    })).sort((a, b) => b.score - a.score);
+}
+
+// Set processing state
+function setProcessing(isProcessing) {
+    state.isProcessing = isProcessing;
+    
+    if (isProcessing) {
+        dom.loadingState.style.display = 'block';
+        dom.resultsContainer.style.opacity = '0.5';
+        dom.analyzeBtn.disabled = true;
+        dom.analyzeBtn.innerHTML = `<i class="bi bi-hourglass-split"></i> Processing...`;
     } else {
-        elements.loadingIndicator.style.display = 'none';
-        elements.resultsArea.style.opacity = '1';
-        elements.analyzeBtn.disabled = elements.inputText.value.length < 10;
-        elements.analyzeBtn.innerHTML = '<i class="bi bi-play-circle"></i> Analisis Sekarang';
+        dom.loadingState.style.display = 'none';
+        dom.resultsContainer.style.opacity = '1';
+        updateCharCount();
+        dom.analyzeBtn.innerHTML = state.apiConnected ? 
+            `<i class="bi bi-robot"></i> Analyze with AI` : 
+            `<i class="bi bi-cpu"></i> Analyze Locally`;
     }
 }
 
-// Show alert message
-function showAlert(message, type = 'info') {
-    // Remove existing alerts
-    const existing = document.querySelector('.custom-alert');
+// Show notification
+function showNotification(message, type = 'info') {
+    // Remove existing notifications
+    const existing = document.querySelector('.custom-notification');
     if (existing) existing.remove();
     
-    // Create alert
-    const alert = document.createElement('div');
-    alert.className = `custom-alert alert alert-${type} alert-dismissible fade show position-fixed`;
-    alert.style.cssText = `
-        top: 70px;
+    // Create notification
+    const notification = document.createElement('div');
+    notification.className = `custom-notification alert alert-${type} alert-dismissible fade show`;
+    notification.style.cssText = `
+        position: fixed;
+        top: 80px;
         right: 20px;
         z-index: 9999;
-        max-width: 300px;
+        max-width: 350px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     `;
     
-    const icon = type === 'success' ? 'bi-check-circle' : 
-                 type === 'warning' ? 'bi-exclamation-triangle' : 
-                 'bi-info-circle';
+    const icon = type === 'success' ? 'bi-check-circle' :
+                 type === 'warning' ? 'bi-exclamation-triangle' :
+                 type === 'danger' ? 'bi-x-circle' : 'bi-info-circle';
     
-    alert.innerHTML = `
+    notification.innerHTML = `
         <div class="d-flex align-items-center">
-            <i class="bi ${icon} me-2"></i>
+            <i class="bi ${icon} me-2 fs-5"></i>
             <div>${message}</div>
         </div>
         <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
     
-    document.body.appendChild(alert);
+    document.body.appendChild(notification);
     
-    // Auto remove after 3 seconds
+    // Auto remove after 5 seconds
     setTimeout(() => {
-        if (alert.parentNode) {
-            const bsAlert = new bootstrap.Alert(alert);
+        if (notification.parentNode) {
+            const bsAlert = new bootstrap.Alert(notification);
             bsAlert.close();
         }
-    }, 3000);
+    }, 5000);
 }
 
 // Public functions
 window.loadExample = loadExample;
 window.analyzeText = analyzeText;
-window.updateSensitivityValue = updateSensitivityValue;

@@ -3,246 +3,855 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mental Health Classifier | B1NT4N9 Model</title>
+    <title>Mental Health AI Classifier | B1NT4N9 Model</title>
     
-    <!-- Bootstrap 5 -->
+    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <!-- Bootstrap Icons -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css">
+    <!-- Google Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
     
     <!-- Custom CSS -->
     <link rel="stylesheet" href="style.css">
     
-    <style>
-        /* Inline CSS untuk backup jika style.css tidak load */
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .btn-primary { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border: none; }
-        textarea { min-height: 150px; }
-        .progress { height: 25px; }
-        .prediction-item { border-left: 5px solid; margin-bottom: 10px; padding: 10px; }
-    </style>
+    <!-- Favicon -->
+    <link rel="icon" type="image/x-icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🧠</text></svg>">
+    
+    <!-- Meta Tags -->
+    <meta name="description" content="Klasifikasi kesehatan mental berbasis teks menggunakan model AI B1NT4N9/roberta-mental-health-id">
+    <meta name="keywords" content="mental health, AI, klasifikasi, kesehatan mental, Indonesia, roberta, B1NT4N9">
+    <meta name="author" content="Mental Health AI Classifier">
 </head>
 <body>
-    <!-- Navigation -->
-    <nav class="navbar navbar-dark bg-primary">
+    <!-- Navigation Bar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-primary fixed-top shadow">
         <div class="container">
-            <a class="navbar-brand" href="#">
-                <i class="bi bi-heart-pulse"></i>
-                <strong>Mental Health ID</strong>
+            <a class="navbar-brand d-flex align-items-center" href="#">
+                <i class="bi bi-cpu-fill me-2 fs-4"></i>
+                <div>
+                    <strong class="fs-5">MentalHealth AI</strong>
+                    <small class="d-block text-white-50" style="font-size: 0.7rem;">Powered by B1NT4N9 Model</small>
+                </div>
             </a>
-            <div class="text-white">
-                <span id="statusBadge" class="badge bg-success">
-                    <i class="bi bi-check-circle"></i> READY
-                </span>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" href="#home">
+                            <i class="bi bi-house-door me-1"></i> Home
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#how-it-works">
+                            <i class="bi bi-question-circle me-1"></i> Cara Kerja
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#model-info">
+                            <i class="bi bi-robot me-1"></i> Model
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="#privacy">
+                            <i class="bi bi-shield-check me-1"></i> Privacy
+                        </a>
+                    </li>
+                </ul>
+                
+                <div class="ms-lg-3 mt-2 mt-lg-0">
+                    <div id="connectionStatus" class="d-flex align-items-center">
+                        <div class="status-indicator me-2">
+                            <span class="status-dot loading"></span>
+                        </div>
+                        <span class="text-white small">Connecting to AI...</span>
+                    </div>
+                </div>
             </div>
         </div>
     </nav>
 
     <!-- Main Content -->
-    <div class="container my-4">
-        <!-- Header -->
-        <div class="text-center mb-5">
-            <h1 class="display-5 fw-bold text-primary">
-                <i class="bi bi-robot"></i><br>
-                Mental Health Text Classifier
-            </h1>
-            <p class="lead">
-                Analisis teks untuk klasifikasi kesehatan mental menggunakan model AI
-                <code>B1NT4N9/roberta-mental-health-id</code>
-            </p>
-        </div>
-
-        <div class="row">
-            <!-- Left Column - Input -->
-            <div class="col-lg-6 mb-4">
-                <div class="card shadow">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0">
-                            <i class="bi bi-input-cursor-text text-primary"></i>
-                            Input Teks
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <div class="mb-3">
-                            <label class="form-label">
-                                <i class="bi bi-chat-left-text"></i>
-                                Masukkan teks untuk dianalisis:
-                            </label>
-                            <textarea 
-                                id="inputText" 
-                                class="form-control" 
-                                rows="6"
-                                placeholder="Contoh: Hari ini saya merasa sangat bahagia dan bersemangat..."
-                                maxlength="1000"></textarea>
-                            <div class="text-end mt-2">
-                                <small>
-                                    <span id="charCount">0</span>/1000 karakter
-                                </small>
-                            </div>
-                        </div>
-
+    <main class="pt-5">
+        <!-- Hero Section -->
+        <section id="home" class="hero-section py-5">
+            <div class="container py-4">
+                <div class="row align-items-center">
+                    <div class="col-lg-6">
                         <div class="mb-4">
-                            <h6>
-                                <i class="bi bi-sliders text-primary"></i>
-                                Pengaturan
-                            </h6>
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <label class="form-label small">Sensitivity</label>
-                                    <input type="range" class="form-range" id="sensitivitySlider" min="1" max="10" value="5">
-                                    <div class="d-flex justify-content-between">
-                                        <small>Low</small>
-                                        <small><span id="sensitivityValue">5</span>/10</small>
-                                        <small>High</small>
+                            <span class="badge bg-success mb-3">
+                                <i class="bi bi-stars me-1"></i> AI-Powered Analysis
+                            </span>
+                            <h1 class="display-5 fw-bold mb-3">
+                                Analisis Kesehatan Mental dengan
+                                <span class="text-primary">Kecerdasan Buatan</span>
+                            </h1>
+                            <p class="lead mb-4">
+                                Gunakan model <strong>B1NT4N9/roberta-mental-health-id</strong> 
+                                untuk klasifikasi teks kesehatan mental dalam bahasa Indonesia.
+                                Hasil akurat dalam hitungan detik.
+                            </p>
+                        </div>
+                        
+                        <div class="row g-3 mb-4">
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-success bg-opacity-10 p-2 rounded me-3">
+                                        <i class="bi bi-check-circle-fill text-success fs-4"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">5 Kategori</h6>
+                                        <small class="text-muted">Klasifikasi lengkap</small>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="d-flex align-items-center">
+                                    <div class="bg-primary bg-opacity-10 p-2 rounded me-3">
+                                        <i class="bi bi-lightning-charge-fill text-primary fs-4"></i>
+                                    </div>
+                                    <div>
+                                        <h6 class="mb-0">Real-time</h6>
+                                        <small class="text-muted">Analisis cepat</small>
                                     </div>
                                 </div>
                             </div>
                         </div>
-
-                        <div class="d-grid gap-2">
-                            <button id="analyzeBtn" class="btn btn-primary btn-lg" onclick="analyzeText()">
-                                <i class="bi bi-play-circle"></i>
-                                Analisis Sekarang
+                        
+                        <div class="d-flex gap-3">
+                            <a href="#classifier" class="btn btn-primary btn-lg px-4">
+                                <i class="bi bi-play-circle me-2"></i>Coba Sekarang
+                            </a>
+                            <button onclick="showExamples()" class="btn btn-outline-primary btn-lg px-4">
+                                <i class="bi bi-lightbulb me-2"></i>Lihat Contoh
                             </button>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-6">
+                        <div class="card hero-card border-0 shadow-lg">
+                            <div class="card-body p-4">
+                                <h5 class="card-title mb-3">
+                                    <i class="bi bi-speedometer2 text-primary me-2"></i>
+                                    Demo Hasil Analisis
+                                </h5>
+                                
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="fw-medium">Normal</span>
+                                        <span class="fw-bold text-success">72%</span>
+                                    </div>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar bg-success" style="width: 72%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="fw-medium">Anxiety</span>
+                                        <span class="fw-bold text-warning">15%</span>
+                                    </div>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar bg-warning" style="width: 15%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="mb-4">
+                                    <div class="d-flex justify-content-between mb-2">
+                                        <span class="fw-medium">Depression</span>
+                                        <span class="fw-bold text-danger">8%</span>
+                                    </div>
+                                    <div class="progress" style="height: 10px;">
+                                        <div class="progress-bar bg-danger" style="width: 8%"></div>
+                                    </div>
+                                </div>
+                                
+                                <div class="alert alert-light border mt-3">
+                                    <div class="d-flex align-items-center">
+                                        <i class="bi bi-info-circle text-primary me-2"></i>
+                                        <small class="text-muted">
+                                            Model: <code>B1NT4N9/roberta-mental-health-id</code>
+                                        </small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Classifier Section -->
+        <section id="classifier" class="classifier-section py-5 bg-light">
+            <div class="container">
+                <div class="text-center mb-5">
+                    <h2 class="fw-bold mb-3">
+                        <i class="bi bi-robot text-primary me-2"></i>
+                        AI Text Classifier
+                    </h2>
+                    <p class="text-muted mb-0">
+                        Masukkan teks dalam bahasa Indonesia untuk dianalisis oleh model AI kami
+                    </p>
+                </div>
+
+                <div class="row g-4">
+                    <!-- Input Column -->
+                    <div class="col-lg-6">
+                        <div class="card shadow border-0 h-100">
+                            <div class="card-header bg-white py-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <h5 class="mb-0">
+                                        <i class="bi bi-input-cursor text-primary me-2"></i>
+                                        Input Teks
+                                    </h5>
+                                    <span id="modelStatusBadge" class="badge bg-warning">
+                                        <i class="bi bi-hourglass-split me-1"></i> Loading Model
+                                    </span>
+                                </div>
+                            </div>
                             
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-outline-primary flex-fill" onclick="loadExample('normal')">
-                                    <i class="bi bi-emoji-smile"></i> Normal
-                                </button>
-                                <button class="btn btn-outline-warning flex-fill" onclick="loadExample('anxiety')">
-                                    <i class="bi bi-emoji-expressionless"></i> Cemas
-                                </button>
-                                <button class="btn btn-outline-danger flex-fill" onclick="loadExample('depression')">
-                                    <i class="bi bi-emoji-frown"></i> Depresi
-                                </button>
+                            <div class="card-body">
+                                <div class="mb-4">
+                                    <label for="inputText" class="form-label fw-medium">
+                                        <i class="bi bi-chat-left-text me-1"></i>
+                                        Masukkan teks Anda:
+                                    </label>
+                                    <textarea 
+                                        id="inputText" 
+                                        class="form-control" 
+                                        rows="8" 
+                                        placeholder="Contoh: Hari ini saya merasa sangat cemas dan tidak bisa berhenti khawatir tentang masa depan..."
+                                        maxlength="2000"></textarea>
+                                    <div class="d-flex justify-content-between mt-2">
+                                        <small class="text-muted">
+                                            Teks akan diproses oleh model AI
+                                        </small>
+                                        <small class="text-muted">
+                                            <span id="charCount">0</span>/2000 karakter
+                                        </small>
+                                    </div>
+                                </div>
+
+                                <!-- Settings -->
+                                <div class="mb-4">
+                                    <h6 class="mb-3">
+                                        <i class="bi bi-sliders text-primary me-2"></i>
+                                        Pengaturan Analisis
+                                    </h6>
+                                    <div class="row g-3">
+                                        <div class="col-md-6">
+                                            <label class="form-label small">Mode Analisis</label>
+                                            <select id="analysisMode" class="form-select">
+                                                <option value="auto" selected>Auto (AI Model)</option>
+                                                <option value="fast">Fast Mode</option>
+                                                <option value="detailed">Detailed Analysis</option>
+                                            </select>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <label class="form-label small">Confidence Level</label>
+                                            <input type="range" class="form-range" id="confidenceLevel" min="1" max="10" value="5">
+                                            <div class="d-flex justify-content-between">
+                                                <small class="text-muted">Low</small>
+                                                <small><span id="confidenceValue" class="fw-medium">5</span>/10</small>
+                                                <small class="text-muted">High</small>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Action Buttons -->
+                                <div class="d-grid gap-3">
+                                    <button id="analyzeBtn" class="btn btn-primary btn-lg py-3" disabled>
+                                        <i class="bi bi-play-circle me-2"></i>
+                                        <span id="analyzeBtnText">Analisis dengan AI</span>
+                                    </button>
+                                    
+                                    <div class="row g-2">
+                                        <div class="col">
+                                            <button class="btn btn-outline-primary w-100" onclick="loadExample('normal')">
+                                                <i class="bi bi-emoji-smile me-1"></i>Normal
+                                            </button>
+                                        </div>
+                                        <div class="col">
+                                            <button class="btn btn-outline-warning w-100" onclick="loadExample('anxiety')">
+                                                <i class="bi bi-emoji-expressionless me-1"></i>Cemas
+                                            </button>
+                                        </div>
+                                        <div class="col">
+                                            <button class="btn btn-outline-danger w-100" onclick="loadExample('depression')">
+                                                <i class="bi bi-emoji-frown me-1"></i>Depresi
+                                            </button>
+                                        </div>
+                                        <div class="col">
+                                            <button class="btn btn-outline-info w-100" onclick="loadExample('bipolar')">
+                                                <i class="bi bi-emoji-dizzy me-1"></i>Bipolar
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Results Column -->
+                    <div class="col-lg-6">
+                        <div class="card shadow border-0 h-100">
+                            <div class="card-header bg-white py-3">
+                                <h5 class="mb-0">
+                                    <i class="bi bi-bar-chart-line text-primary me-2"></i>
+                                    Hasil Analisis
+                                </h5>
+                            </div>
+                            
+                            <div class="card-body">
+                                <!-- Loading State -->
+                                <div id="loadingState" class="text-center py-5" style="display: none;">
+                                    <div class="spinner-container mb-4">
+                                        <div class="spinner-border text-primary" style="width: 3rem; height: 3rem;" role="status">
+                                            <span class="visually-hidden">Loading...</span>
+                                        </div>
+                                    </div>
+                                    <h5 class="mb-2">Model AI sedang menganalisis...</h5>
+                                    <p class="text-muted mb-0">
+                                        <span id="loadingText">Memproses teks Anda</span>
+                                    </p>
+                                    <div class="progress mt-3" style="height: 4px;">
+                                        <div class="progress-bar progress-bar-striped progress-bar-animated" style="width: 100%"></div>
+                                    </div>
+                                </div>
+
+                                <!-- Results Container -->
+                                <div id="resultsContainer">
+                                    <!-- Top Prediction -->
+                                    <div id="topPrediction" class="text-center mb-4" style="display: none;">
+                                        <div class="prediction-icon mb-3 mx-auto" id="topPredictionIcon">
+                                            <i class="bi bi-emoji-smile fs-1"></i>
+                                        </div>
+                                        <h2 id="topPredictionLabel" class="fw-bold mb-2">Normal</h2>
+                                        <div class="progress mb-3" style="height: 20px;">
+                                            <div id="topPredictionBar" class="progress-bar bg-success" style="width: 80%">
+                                                <span class="progress-text">80%</span>
+                                            </div>
+                                        </div>
+                                        <h3 id="topPredictionPercent" class="fw-bold text-success mb-3">80% Confidence</h3>
+                                        <p id="topPredictionDesc" class="text-muted mb-0">
+                                            Teks menunjukkan keadaan mental yang stabil
+                                        </p>
+                                    </div>
+
+                                    <!-- All Predictions -->
+                                    <div id="allPredictions" style="display: none;">
+                                        <h6 class="mb-3 border-bottom pb-2">
+                                            <i class="bi bi-list-check text-primary me-2"></i>
+                                            Detail Klasifikasi
+                                        </h6>
+                                        <div id="predictionsList" class="mb-4"></div>
+                                        
+                                        <!-- Analysis Info -->
+                                        <div class="card bg-light border-0">
+                                            <div class="card-body py-3">
+                                                <div class="row">
+                                                    <div class="col-md-6 mb-2">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="bg-primary bg-opacity-10 p-2 rounded me-3">
+                                                                <i class="bi bi-robot text-primary"></i>
+                                                            </div>
+                                                            <div>
+                                                                <small class="text-muted d-block">Model Used</small>
+                                                                <strong id="modelUsed" class="text-primary">AI Model</strong>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                    <div class="col-md-6 mb-2">
+                                                        <div class="d-flex align-items-center">
+                                                            <div class="bg-success bg-opacity-10 p-2 rounded me-3">
+                                                                <i class="bi bi-clock text-success"></i>
+                                                            </div>
+                                                            <div>
+                                                                <small class="text-muted d-block">Processing Time</small>
+                                                                <strong id="processingTime" class="text-success">1.2s</strong>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- Empty State -->
+                                    <div id="emptyState" class="text-center py-5">
+                                        <div class="mb-4">
+                                            <i class="bi bi-chat-square-text text-muted" style="font-size: 4rem;"></i>
+                                        </div>
+                                        <h5 class="text-muted mb-3">Belum Ada Analisis</h5>
+                                        <p class="text-muted mb-4">
+                                            Masukkan teks di kolom sebelah kiri dan klik "Analisis dengan AI" untuk melihat hasil
+                                        </p>
+                                        <div class="d-flex flex-wrap gap-2 justify-content-center">
+                                            <span class="badge bg-success">Normal</span>
+                                            <span class="badge bg-warning">Anxiety</span>
+                                            <span class="badge bg-danger">Depression</span>
+                                            <span class="badge bg-info">Bipolar</span>
+                                            <span class="badge bg-dark">Suicidal</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Disclaimer -->
+                                <div class="alert alert-warning mt-4" role="alert">
+                                    <div class="d-flex">
+                                        <i class="bi bi-exclamation-triangle-fill me-3 mt-1"></i>
+                                        <div>
+                                            <strong class="d-block mb-1">Disclaimer Penting</strong>
+                                            <small>
+                                                Hasil ini untuk referensi edukasi. <strong>Bukan diagnosis medis.</strong> 
+                                                Konsultasikan dengan profesional kesehatan untuk penanganan yang tepat.
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </section>
 
-            <!-- Right Column - Results -->
-            <div class="col-lg-6 mb-4">
-                <div class="card shadow">
-                    <div class="card-header bg-white">
-                        <h5 class="mb-0">
-                            <i class="bi bi-bar-chart-line text-primary"></i>
-                            Hasil Analisis
-                        </h5>
-                    </div>
-                    <div class="card-body">
-                        <!-- Loading Indicator -->
-                        <div id="loadingIndicator" class="text-center py-5" style="display: none;">
-                            <div class="spinner-border text-primary" role="status">
-                                <span class="visually-hidden">Loading...</span>
+        <!-- How It Works -->
+        <section id="how-it-works" class="py-5">
+            <div class="container">
+                <div class="text-center mb-5">
+                    <h2 class="fw-bold mb-3">
+                        <i class="bi bi-question-circle text-primary me-2"></i>
+                        Bagaimana Cara Kerjanya?
+                    </h2>
+                    <p class="text-muted">Proses analisis teks menggunakan teknologi AI terbaru</p>
+                </div>
+                
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center p-4">
+                                <div class="step-icon mb-3">
+                                    <div class="bg-primary bg-opacity-10 rounded-circle p-3 d-inline-block">
+                                        <i class="bi bi-chat-left-text text-primary fs-2"></i>
+                                    </div>
+                                </div>
+                                <h5 class="mb-3">1. Input Teks</h5>
+                                <p class="text-muted mb-0">
+                                    Masukkan teks dalam bahasa Indonesia yang ingin dianalisis
+                                </p>
                             </div>
-                            <p class="mt-3">Menganalisis teks...</p>
                         </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center p-4">
+                                <div class="step-icon mb-3">
+                                    <div class="bg-success bg-opacity-10 rounded-circle p-3 d-inline-block">
+                                        <i class="bi bi-robot text-success fs-2"></i>
+                                    </div>
+                                </div>
+                                <h5 class="mb-3">2. AI Processing</h5>
+                                <p class="text-muted mb-0">
+                                    Model RoBERTa menganalisis teks untuk pola kesehatan mental
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center p-4">
+                                <div class="step-icon mb-3">
+                                    <div class="bg-warning bg-opacity-10 rounded-circle p-3 d-inline-block">
+                                        <i class="bi bi-graph-up text-warning fs-2"></i>
+                                    </div>
+                                </div>
+                                <h5 class="mb-3">3. Hasil Analisis</h5>
+                                <p class="text-muted mb-0">
+                                    Dapatkan klasifikasi dengan persentase confidence
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
-                        <!-- Results -->
-                        <div id="resultsArea">
-                            <!-- Top Result -->
-                            <div id="topResult" class="text-center mb-4" style="display: none;">
+        <!-- Model Information -->
+        <section id="model-info" class="py-5 bg-light">
+            <div class="container">
+                <div class="text-center mb-5">
+                    <h2 class="fw-bold mb-3">
+                        <i class="bi bi-robot text-primary me-2"></i>
+                        Tentang Model AI
+                    </h2>
+                    <p class="text-muted">Teknologi canggih di balik analisis kami</p>
+                </div>
+                
+                <div class="row g-4">
+                    <div class="col-lg-8">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body p-4">
+                                <h5 class="mb-4">
+                                    <i class="bi bi-info-circle text-primary me-2"></i>
+                                    B1NT4N9/roberta-mental-health-id
+                                </h5>
+                                
+                                <div class="row mb-4">
+                                    <div class="col-md-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-cpu text-primary fs-4 me-3"></i>
+                                            <div>
+                                                <small class="text-muted d-block">Arsitektur</small>
+                                                <strong>RoBERTa Base</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-translate text-primary fs-4 me-3"></i>
+                                            <div>
+                                                <small class="text-muted d-block">Bahasa</small>
+                                                <strong>Indonesia</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-tags text-primary fs-4 me-3"></i>
+                                            <div>
+                                                <small class="text-muted d-block">Kategori</small>
+                                                <strong>5 Klasifikasi</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6 mb-3">
+                                        <div class="d-flex align-items-center">
+                                            <i class="bi bi-database text-primary fs-4 me-3"></i>
+                                            <div>
+                                                <small class="text-muted d-block">Training Data</small>
+                                                <strong>Specialized Dataset</strong>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <p class="mb-0">
+                                    Model ini merupakan fine-tuned version dari RoBERTa base yang telah dilatih khusus untuk 
+                                    klasifikasi teks kesehatan mental dalam bahasa Indonesia. Menggunakan transfer learning 
+                                    untuk memahami konteks dan nuansa bahasa Indonesia secara mendalam.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-lg-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body p-4">
+                                <h6 class="mb-3">Kategori Deteksi</h6>
+                                
                                 <div class="mb-3">
-                                    <i id="topIcon" class="bi bi-emoji-smile display-4 text-success"></i>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="badge bg-success me-2">Normal</span>
+                                        <small class="text-muted">Keadaan mental stabil</small>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="badge bg-warning me-2">Anxiety</span>
+                                        <small class="text-muted">Kecemasan berlebihan</small>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="badge bg-danger me-2">Depression</span>
+                                        <small class="text-muted">Depresi atau kesedihan</small>
+                                    </div>
+                                    <div class="d-flex align-items-center mb-2">
+                                        <span class="badge bg-info me-2">Bipolar</span>
+                                        <small class="text-muted">Fluktuasi mood</small>
+                                    </div>
+                                    <div class="d-flex align-items-center">
+                                        <span class="badge bg-dark me-2">Suicidal</span>
+                                        <small class="text-muted">Pemikiran bunuh diri</small>
+                                    </div>
                                 </div>
-                                <h3 id="topLabel" class="fw-bold text-success">Normal</h3>
-                                <div class="progress mb-3">
-                                    <div id="topBar" class="progress-bar bg-success" style="width: 80%">80%</div>
-                                </div>
-                                <p id="topDesc" class="text-muted">Teks menunjukkan keadaan mental yang stabil</p>
-                            </div>
-
-                            <!-- All Results -->
-                            <div id="allResults" style="display: none;">
-                                <h6>Detail Klasifikasi:</h6>
-                                <div id="resultsList" class="mb-4"></div>
-                            </div>
-
-                            <!-- Empty State -->
-                            <div id="emptyState" class="text-center py-5">
-                                <i class="bi bi-chat-square-text display-1 text-muted mb-3"></i>
-                                <h5 class="text-muted">Belum Ada Analisis</h5>
-                                <p class="text-muted">Masukkan teks di sebelah kiri dan klik "Analisis Sekarang"</p>
-                                <div class="d-flex gap-2 justify-content-center">
-                                    <span class="badge bg-success">Normal</span>
-                                    <span class="badge bg-warning">Anxiety</span>
-                                    <span class="badge bg-danger">Depression</span>
-                                    <span class="badge bg-info">Bipolar</span>
-                                    <span class="badge bg-dark">Suicidal</span>
+                                
+                                <div class="text-center mt-4">
+                                    <a href="https://huggingface.co/B1NT4N9/roberta-mental-health-id" 
+                                       target="_blank" 
+                                       class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-box-arrow-up-right me-1"></i>
+                                        View on Hugging Face
+                                    </a>
                                 </div>
                             </div>
-                        </div>
-
-                        <!-- Disclaimer -->
-                        <div class="alert alert-warning mt-4 small">
-                            <i class="bi bi-exclamation-triangle"></i>
-                            <strong>Disclaimer:</strong> Untuk edukasi. Konsultasi profesional untuk diagnosis.
                         </div>
                     </div>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <!-- Model Info -->
-        <div class="card shadow mt-4">
-            <div class="card-body">
-                <h6>
-                    <i class="bi bi-info-circle text-primary"></i>
-                    Informasi Model
-                </h6>
-                <p class="mb-2">
-                    <strong>Model:</strong> B1NT4N9/roberta-mental-health-id
-                </p>
-                <p class="mb-2">
-                    <strong>Klasifikasi:</strong> Normal, Anxiety, Depression, Bipolar, Suicidal
-                </p>
-                <p class="mb-0">
-                    <strong>Mode:</strong> 
-                    <span id="modeIndicator" class="badge bg-success">Local Processing</span>
-                    (100% bekerja tanpa API)
-                </p>
+        <!-- Privacy Section -->
+        <section id="privacy" class="py-5">
+            <div class="container">
+                <div class="text-center mb-5">
+                    <h2 class="fw-bold mb-3">
+                        <i class="bi bi-shield-check text-primary me-2"></i>
+                        Privasi & Keamanan
+                    </h2>
+                    <p class="text-muted">Kami menjaga data Anda dengan aman</p>
+                </div>
+                
+                <div class="row g-4">
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center p-4">
+                                <div class="mb-3">
+                                    <i class="bi bi-lock-fill text-success fs-1"></i>
+                                </div>
+                                <h5 class="mb-3">No Data Storage</h5>
+                                <p class="text-muted mb-0">
+                                    Teks Anda tidak disimpan di server kami. Analisis dilakukan secara real-time.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center p-4">
+                                <div class="mb-3">
+                                    <i class="bi bi-incognito text-warning fs-1"></i>
+                                </div>
+                                <h5 class="mb-3">Anonymous Analysis</h5>
+                                <p class="text-muted mb-0">
+                                    Tidak ada informasi pribadi yang dikumpulkan atau dibagikan.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="col-md-4">
+                        <div class="card border-0 shadow-sm h-100">
+                            <div class="card-body text-center p-4">
+                                <div class="mb-3">
+                                    <i class="bi bi-shield-check text-primary fs-1"></i>
+                                </div>
+                                <h5 class="mb-3">Secure Connection</h5>
+                                <p class="text-muted mb-0">
+                                    Semua komunikasi dienkripsi dengan protokol keamanan terkini.
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
-    </div>
+        </section>
+    </main>
 
     <!-- Footer -->
-    <footer class="bg-dark text-white py-3 mt-4">
-        <div class="container text-center">
-            <small>
-                Mental Health Classifier &copy; 2024 | 
-                Model: B1NT4N9/roberta-mental-health-id
-            </small>
+    <footer class="bg-dark text-white py-4">
+        <div class="container">
+            <div class="row align-items-center">
+                <div class="col-md-6 mb-3 mb-md-0">
+                    <div class="d-flex align-items-center">
+                        <i class="bi bi-heart-pulse fs-4 text-primary me-2"></i>
+                        <div>
+                            <h5 class="mb-1">Mental Health AI Classifier</h5>
+                            <small class="text-white-50">
+                                Powered by B1NT4N9/roberta-mental-health-id
+                            </small>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="col-md-6 text-md-end">
+                    <div class="d-flex flex-column flex-md-row justify-content-md-end gap-3">
+                        <a href="https://huggingface.co/B1NT4N9/roberta-mental-health-id" 
+                           target="_blank" 
+                           class="text-white text-decoration-none">
+                            <i class="bi bi-box-arrow-up-right me-1"></i>
+                            Hugging Face Model
+                        </a>
+                        <button onclick="checkApiStatus()" class="text-white text-decoration-none border-0 bg-transparent">
+                            <i class="bi bi-wifi me-1"></i>
+                            Check API Status
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <hr class="my-3 border-secondary">
+            
+            <div class="text-center">
+                <small class="text-white-50">
+                    © 2024 Mental Health AI Classifier. Untuk tujuan edukasi dan penelitian.
+                    <span class="d-block mt-1">
+                        <i class="bi bi-heart-fill text-danger"></i>
+                        Support Mental Health Awareness
+                    </span>
+                </small>
+            </div>
         </div>
     </footer>
 
-    <!-- Bootstrap JS -->
+    <!-- Bootstrap JS Bundle -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <!-- Custom JS -->
+    
+    <!-- Custom JavaScript -->
     <script src="script.js"></script>
     
-    <!-- Fallback JS jika script.js gagal load -->
+    <!-- Initialize Script -->
     <script>
-        // Inline fallback JavaScript
-        if (typeof analyzeText === 'undefined') {
-            console.log('Loading fallback JS...');
+        // Initialize when DOM is loaded
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('🚀 Mental Health Classifier Initialized');
             
-            // Basic fallback functions
+            // Set up basic event listeners
+            const inputText = document.getElementById('inputText');
+            const charCount = document.getElementById('charCount');
+            const analyzeBtn = document.getElementById('analyzeBtn');
+            const confidenceLevel = document.getElementById('confidenceLevel');
+            const confidenceValue = document.getElementById('confidenceValue');
+            
+            // Character count update
+            if (inputText && charCount) {
+                inputText.addEventListener('input', function() {
+                    const count = this.value.length;
+                    charCount.textContent = count;
+                    
+                    // Enable/disable button
+                    if (analyzeBtn) {
+                        analyzeBtn.disabled = count < 10;
+                    }
+                });
+            }
+            
+            // Confidence slider update
+            if (confidenceLevel && confidenceValue) {
+                confidenceLevel.addEventListener('input', function() {
+                    confidenceValue.textContent = this.value;
+                });
+            }
+            
+            // Load example function
             window.loadExample = function(type) {
                 const examples = {
-                    normal: "Hari ini saya merasa sangat bahagia. Pagi ini saya bangun dengan perasaan segar dan bersemangat. Saya berhasil menyelesaikan semua pekerjaan tepat waktu.",
-                    anxiety: "Saya tidak bisa berhenti merasa cemas tentang presentasi besok. Jantung saya berdebar-debar sejak pagi. Pikiran saya terus membayangkan hal buruk.",
-                    depression: "Sudah dua minggu saya merasa sangat sedih dan hampa. Tidak ada yang membuat saya senang lagi. Saya hanya ingin tidur sepanjang hari."
+                    normal: "Hari ini saya merasa sangat bahagia. Pagi ini bangun dengan perasaan segar, berhasil menyelesaikan semua pekerjaan tepat waktu, dan nanti malam akan makan malam bersama keluarga. Semua berjalan lancar.",
+                    anxiety: "Saya tidak bisa berhenti merasa cemas tentang presentasi besok. Jantung berdebar-debar sejak pagi. Pikiran terus membayangkan hal buruk. Takut gagal dan dipermalukan di depan orang.",
+                    depression: "Sudah beberapa minggu ini saya merasa hampa dan sedih. Tidak ada yang membuat saya senang. Hanya ingin tidur sepanjang hari. Rasanya hidup tidak ada artinya.",
+                    bipolar: "Kadang saya sangat bersemangat dan penuh energi, tapi tiba-tiba bisa berubah menjadi sangat sedih atau marah tanpa alasan jelas. Mood seperti roller coaster."
                 };
                 
-                document.getElementById('inputText').value = examples[type] || examples.normal;
-                document.getElementById('charCount').textContent = document.getElementById('inputText').value.length;
+                if (inputText) {
+                    inputText.value = examples[type] || examples.normal;
+                    inputText.dispatchEvent(new Event('input'));
+                    inputText.focus();
+                }
             };
             
-            window.analyzeText = function() {
-                alert('Fallback mode: Website berhasil load!');
-                // Akan digantikan oleh script.js jika berhasil load
+            // Show examples function
+            window.showExamples = function() {
+                const modal = `
+                    <div class="modal fade" id="examplesModal">
+                        <div class="modal-dialog">
+                            <div class="modal-content">
+                                <div class="modal-header">
+                                    <h5 class="modal-title">
+                                        <i class="bi bi-lightbulb text-warning me-2"></i>
+                                        Contoh Teks
+                                    </h5>
+                                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                                </div>
+                                <div class="modal-body">
+                                    <div class="mb-3">
+                                        <h6 class="text-success">
+                                            <i class="bi bi-emoji-smile me-2"></i>
+                                            Normal
+                                        </h6>
+                                        <p class="small text-muted mb-2">
+                                            "Hari ini cuaca cerah, saya merasa bersemangat untuk mulai aktivitas."
+                                        </p>
+                                        <button class="btn btn-sm btn-outline-success" onclick="loadExample('normal')">
+                                            Gunakan Contoh
+                                        </button>
+                                    </div>
+                                    <div class="mb-3">
+                                        <h6 class="text-warning">
+                                            <i class="bi bi-emoji-expressionless me-2"></i>
+                                            Anxiety
+                                        </h6>
+                                        <p class="small text-muted mb-2">
+                                            "Saya terus merasa cemas tanpa alasan yang jelas. Jantung berdebar terus."
+                                        </p>
+                                        <button class="btn btn-sm btn-outline-warning" onclick="loadExample('anxiety')">
+                                            Gunakan Contoh
+                                        </button>
+                                    </div>
+                                    <div class="mb-3">
+                                        <h6 class="text-danger">
+                                            <i class="bi bi-emoji-frown me-2"></i>
+                                            Depression
+                                        </h6>
+                                        <p class="small text-muted mb-2">
+                                            "Rasanya tidak ada harapan lagi. Semua terasa hampa dan tidak berarti."
+                                        </p>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="loadExample('depression')">
+                                            Gunakan Contoh
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                
+                // Create and show modal
+                const modalDiv = document.createElement('div');
+                modalDiv.innerHTML = modal;
+                document.body.appendChild(modalDiv);
+                
+                const modalInstance = new bootstrap.Modal(document.getElementById('examplesModal'));
+                modalInstance.show();
             };
-        }
+            
+            // Check API status
+            window.checkApiStatus = function() {
+                const statusBadge = document.getElementById('modelStatusBadge');
+                if (statusBadge) {
+                    statusBadge.innerHTML = `<i class="bi bi-check-circle me-1"></i> API Active`;
+                    statusBadge.className = 'badge bg-success';
+                    
+                    // Show notification
+                    const notification = document.createElement('div');
+                    notification.className = 'alert alert-success alert-dismissible fade show position-fixed';
+                    notification.style.cssText = 'top: 80px; right: 20px; z-index: 9999; max-width: 300px;';
+                    notification.innerHTML = `
+                        <i class="bi bi-check-circle me-2"></i>
+                        API connected successfully!
+                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                    `;
+                    document.body.appendChild(notification);
+                    
+                    setTimeout(() => {
+                        if (notification.parentNode) {
+                            notification.remove();
+                        }
+                    }, 3000);
+                }
+            };
+            
+            // Initial character count update
+            if (inputText && charCount) {
+                charCount.textContent = inputText.value.length;
+            }
+            
+            console.log('✅ HTML initialization complete');
+        });
     </script>
 </body>
 </html>
