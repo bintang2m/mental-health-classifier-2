@@ -51,15 +51,8 @@ export default async function handler(req, res) {
             });
         }
         
-        // Your Hugging Face API Key
+        // Your Hugging Face API Key - Use environment variable in production
         const HF_API_KEY = process.env.HF_API_KEY || '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';
-        
-        if (!HF_API_KEY || HF_API_KEY === 'your_huggingface_api_key_here') {
-            return res.status(500).json({
-                error: 'API key not configured',
-                note: 'Please set HF_API_KEY environment variable in Vercel'
-            });
-        }
         
         // Call Hugging Face API
         const hfResponse = await fetch(
@@ -70,7 +63,12 @@ export default async function handler(req, res) {
                     'Authorization': `Bearer ${HF_API_KEY}`,
                     'Content-Type': 'application/json'
                 },
-                body: JSON.stringify({ inputs: text })
+                body: JSON.stringify({ 
+                    inputs: text,
+                    parameters: {
+                        return_all_scores: true
+                    }
+                })
             }
         );
         
@@ -78,7 +76,7 @@ export default async function handler(req, res) {
             const errorText = await hfResponse.text();
             console.error('Hugging Face API error:', hfResponse.status, errorText);
             
-            // Return mock data if API fails (for demo)
+            // Return mock data if API fails
             return res.status(200).json(await generateMockResponse(text, sensitivity));
         }
         
@@ -94,7 +92,8 @@ export default async function handler(req, res) {
             text_analysis: result.text_analysis,
             analysis_time: result.analysis_time,
             model: 'B1NT4N9/roberta-mental-health-id',
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            api_key_used: HF_API_KEY.substring(0, 10) + '...' // Show first 10 chars for debug
         });
         
     } catch (error) {
@@ -110,6 +109,14 @@ export default async function handler(req, res) {
 
 // Process Hugging Face API response
 function processHuggingFaceResponse(apiData, text, sensitivity = { normal: 0.3, confidence: 0.15 }) {
+    console.log('Raw API data:', JSON.stringify(apiData).substring(0, 200));
+    
+    // Check if apiData is array and has expected structure
+    if (!Array.isArray(apiData) || !apiData[0] || !Array.isArray(apiData[0])) {
+        console.error('Unexpected API response format:', apiData);
+        throw new Error('Invalid API response format');
+    }
+    
     // Map Hugging Face labels to our labels
     const labelMap = {
         "LABEL_0": "Normal",
@@ -121,17 +128,22 @@ function processHuggingFaceResponse(apiData, text, sensitivity = { normal: 0.3, 
     
     // Extract predictions
     const rawPredictions = apiData[0];
-    const predictions = rawPredictions.map(item => ({
-        label: labelMap[item.label] || item.label,
-        score: item.score,
-        percentage: Math.round(item.score * 10000) / 100
-    }));
+    const predictions = rawPredictions.map(item => {
+        const label = labelMap[item.label] || item.label;
+        const score = item.score || 0;
+        
+        return {
+            label: label,
+            score: score,
+            percentage: Math.round(score * 10000) / 100
+        };
+    });
     
     // Sort by score (descending)
     predictions.sort((a, b) => b.score - a.score);
     
-    // Apply sensitivity adjustments
-    if (sensitivity) {
+    // Apply sensitivity adjustments if provided
+    if (sensitivity && sensitivity.normal) {
         applySensitivity(predictions, sensitivity, text);
     }
     
@@ -141,7 +153,7 @@ function processHuggingFaceResponse(apiData, text, sensitivity = { normal: 0.3, 
     return {
         predictions,
         text_analysis: textAnalysis,
-        analysis_time: 1.5 // Estimated analysis time in seconds
+        analysis_time: 1.5
     };
 }
 
@@ -150,20 +162,24 @@ function applySensitivity(predictions, sensitivity, text) {
     const normalPrediction = predictions.find(p => p.label === 'Normal');
     const textLower = text.toLowerCase();
     
+    if (!normalPrediction) return;
+    
     // Boost normal prediction if text contains normal indicators
     const normalIndicators = ['baik', 'senang', 'bahagia', 'puas', 'normal', 'sehat'];
     const hasNormalIndicators = normalIndicators.some(indicator => textLower.includes(indicator));
     
-    if (normalPrediction && hasNormalIndicators) {
+    if (hasNormalIndicators) {
         const boost = sensitivity.normal * 0.5;
         normalPrediction.score = Math.min(0.95, normalPrediction.score + boost);
         
         // Re-normalize all scores
         const total = predictions.reduce((sum, p) => sum + p.score, 0);
-        predictions.forEach(p => {
-            p.score = p.score / total;
-            p.percentage = Math.round(p.score * 10000) / 100;
-        });
+        if (total > 0) {
+            predictions.forEach(p => {
+                p.score = p.score / total;
+                p.percentage = Math.round(p.score * 10000) / 100;
+            });
+        }
         
         // Re-sort
         predictions.sort((a, b) => b.score - a.score);
