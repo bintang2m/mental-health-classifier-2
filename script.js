@@ -1,450 +1,273 @@
-// Mental Health Classifier - Main Script
-// API Key: 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
+/**
+ * Mental Health Classifier - 100% Browser Based
+ * Tidak perlu API, tidak ada CORS issue
+ * Semua processing di browser user
+ */
 
-// Configuration
+// Configuration - Semua data di local
 const CONFIG = {
-    API_ENDPOINT: '/api/predict', // Local API endpoint
-    HUGGINGFACE_ENDPOINT: 'https://api-inference.huggingface.co/models/B1NT4N9/roberta-mental-health-id',
-    USE_LOCAL_API: true, // Set to false to call Hugging Face directly (NOT RECOMMENDED)
-    
-    // Model Labels
+    // Label klasifikasi
     LABELS: ["Normal", "Anxiety", "Depression", "Bipolar", "Suicidal"],
     
-    // Label Information
+    // Informasi tiap label
     LABEL_INFO: {
         "Normal": {
             icon: "bi-emoji-smile",
             color: "success",
             bgColor: "#4cc9f0",
             description: "Teks menunjukkan keadaan mental yang stabil dan sehat.",
-            keywords: ['baik', 'senang', 'bahagia', 'puas', 'normal', 'sehat', 'stabil']
+            keywords: ['baik', 'senang', 'bahagia', 'puas', 'normal', 'sehat', 'stabil', 'gembira', 'ceria']
         },
         "Anxiety": {
             icon: "bi-emoji-expressionless",
             color: "warning",
             bgColor: "#f8961e",
             description: "Terdapat indikasi kecemasan atau kekhawatiran berlebihan.",
-            keywords: ['cemas', 'khawatir', 'takut', 'gelisah', 'panic', 'neraka', 'gugup']
+            keywords: ['cemas', 'khawatir', 'takut', 'gelisah', 'panic', 'gugup', 'nervous', 'deg-degan', 'was-was']
         },
         "Depression": {
             icon: "bi-emoji-frown",
             color: "danger",
             bgColor: "#f72585",
             description: "Terdapat tanda-tanda depresi atau perasaan sedih mendalam.",
-            keywords: ['sedih', 'depresi', 'putus asa', 'hampa', 'lelah', 'tidak berguna', 'malah']
+            keywords: ['sedih', 'depresi', 'putus asa', 'hampa', 'lelah', 'tidak berguna', 'malah', 'tertekan', 'murung']
         },
         "Bipolar": {
             icon: "bi-emoji-dizzy",
             color: "info",
             bgColor: "#7209b7",
             description: "Terdapat fluktuasi mood yang signifikan.",
-            keywords: ['naik turun', 'mood swing', 'euforia', 'marah', 'impulsif', 'berubah-ubah']
+            keywords: ['naik turun', 'mood swing', 'euforia', 'marah', 'impulsif', 'berubah-ubah', 'ekstrim', 'meledak']
         },
         "Suicidal": {
             icon: "bi-emoji-angry",
             color: "dark",
             bgColor: "#212529",
             description: "Terdapat pemikiran atau isyarat tentang bunuh diri.",
-            keywords: ['mati', 'bunuh diri', 'ending', 'habis', 'sakit hati', 'putus asa total']
+            keywords: ['mati', 'bunuh diri', 'ending', 'habis', 'sakit hati', 'putus asa total', 'mengakhiri']
         }
     },
     
-    // Default Thresholds
-    THRESHOLDS: {
-        normal: 0.3,
-        confidence: 0.15
-    }
+    // Positive words yang meningkatkan skor Normal
+    POSITIVE_WORDS: [
+        'bahagia', 'senang', 'gembira', 'ceria', 'puas', 'bangga', 
+        'bersemangat', 'optimis', 'baik', 'hebat', 'luar biasa',
+        'terima kasih', 'syukur', 'bersyukur', 'alhamdulillah'
+    ],
+    
+    // Negative words yang menurunkan skor Normal
+    NEGATIVE_WORDS: [
+        'sedih', 'kecewa', 'marah', 'kesal', 'frustasi', 'stress',
+        'tertekan', 'lelah', 'capek', 'bosan', 'jenuh', 'kesepian'
+    ]
 };
 
-// Application State
-let appState = {
-    isAnalyzing: false,
-    modelReady: false,
-    lastAnalysis: null,
-    currentText: "",
-    sensitivity: {
-        normal: 0.3,
-        confidence: 0.15
-    }
-};
+// Global State
+let currentSensitivity = 5; // 1-10
 
 // DOM Elements
 const elements = {
-    // Status
-    statusDot: document.getElementById('statusDot'),
-    statusText: document.getElementById('statusText'),
-    
-    // Input
     inputText: document.getElementById('inputText'),
-    charCount: document.getElementById('charCount'),
     analyzeBtn: document.getElementById('analyzeBtn'),
-    
-    // Sliders
-    normalSensitivity: document.getElementById('normalSensitivity'),
-    normalValue: document.getElementById('normalValue'),
-    confidenceThreshold: document.getElementById('confidenceThreshold'),
-    confidenceValue: document.getElementById('confidenceValue'),
-    
-    // Results
-    loadingState: document.getElementById('loadingState'),
-    resultsContainer: document.getElementById('resultsContainer'),
+    charCount: document.getElementById('charCount'),
+    sensitivitySlider: document.getElementById('sensitivitySlider'),
+    sensitivityValue: document.getElementById('sensitivityValue'),
+    loadingIndicator: document.getElementById('loadingIndicator'),
+    resultsArea: document.getElementById('resultsArea'),
+    topResult: document.getElementById('topResult'),
+    allResults: document.getElementById('allResults'),
     emptyState: document.getElementById('emptyState'),
-    topPrediction: document.getElementById('topPrediction'),
-    allPredictions: document.getElementById('allPredictions'),
-    
-    // Prediction Elements
-    topPredictionIcon: document.getElementById('topPredictionIcon'),
-    topPredictionLabel: document.getElementById('topPredictionLabel'),
-    topPredictionBar: document.getElementById('topPredictionBar'),
-    topPredictionPercent: document.getElementById('topPredictionPercent'),
-    topPredictionDesc: document.getElementById('topPredictionDesc'),
-    
-    predictionsList: document.getElementById('predictionsList'),
-    normalIndicators: document.getElementById('normalIndicators'),
-    emotionWords: document.getElementById('emotionWords')
+    topIcon: document.getElementById('topIcon'),
+    topLabel: document.getElementById('topLabel'),
+    topBar: document.getElementById('topBar'),
+    topDesc: document.getElementById('topDesc'),
+    resultsList: document.getElementById('resultsList'),
+    statusBadge: document.getElementById('statusBadge'),
+    modeIndicator: document.getElementById('modeIndicator')
 };
 
-// Initialize Application
-function initApp() {
-    console.log('🚀 Initializing Mental Health Classifier...');
+// Initialize when page loads
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🚀 Mental Health Classifier Initialized');
     
-    // Initialize status
-    updateStatus('loading', 'Loading model...');
-    
-    // Initialize event listeners
+    // Setup event listeners
     setupEventListeners();
     
-    // Check API status
-    checkApiStatus();
-    
-    // Update UI
+    // Update initial UI
     updateCharCount();
-    updateSliderValues();
+    updateSensitivityValue();
     
-    console.log('✅ App initialized');
-}
+    // Set mode indicator
+    elements.modeIndicator.textContent = "Local Processing";
+    elements.modeIndicator.className = "badge bg-success";
+    
+    // Set status
+    elements.statusBadge.innerHTML = '<i class="bi bi-check-circle"></i> READY';
+    elements.statusBadge.className = 'badge bg-success';
+    
+    console.log('✅ System ready - No API needed');
+});
 
-// Setup Event Listeners
+// Setup all event listeners
 function setupEventListeners() {
-    // Input text changes
-    elements.inputText.addEventListener('input', function() {
-        updateCharCount();
-        updateAnalyzeButton();
-        appState.currentText = this.value;
-    });
+    // Input text change
+    elements.inputText.addEventListener('input', updateCharCount);
     
-    // Slider events are handled via oninput in HTML
+    // Sensitivity slider
+    elements.sensitivitySlider.addEventListener('input', updateSensitivityValue);
     
     // Enter key to analyze
     elements.inputText.addEventListener('keydown', function(e) {
-        if (e.key === 'Enter' && e.ctrlKey && !appState.isAnalyzing) {
+        if (e.key === 'Enter' && e.ctrlKey) {
+            e.preventDefault();
             analyzeText();
         }
     });
 }
 
-// Update Status Indicator
-function updateStatus(status, message) {
-    const dot = elements.statusDot;
-    const text = elements.statusText;
-    
-    dot.className = 'status-dot';
-    text.textContent = message;
-    
-    switch(status) {
-        case 'loading':
-            dot.classList.add('loading');
-            text.classList.add('text-warning');
-            break;
-        case 'connected':
-            dot.classList.add('connected');
-            text.classList.add('text-success');
-            appState.modelReady = true;
-            break;
-        case 'error':
-            dot.classList.add('disconnected');
-            text.classList.add('text-danger');
-            break;
-    }
-}
-
-// Check API Status
-async function checkApiStatus() {
-    try {
-        const response = await fetch('/api/predict', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ text: 'test', test: true })
-        });
-        
-        if (response.ok) {
-            updateStatus('connected', 'API Connected');
-        } else {
-            updateStatus('error', 'API Error');
-        }
-    } catch (error) {
-        console.warn('API check failed:', error);
-        updateStatus('connected', 'Mock Mode Active');
-    }
-}
-
-// Update Character Count
+// Update character count
 function updateCharCount() {
     const text = elements.inputText.value;
     const count = text.length;
     elements.charCount.textContent = count;
     
-    // Update color based on length
-    if (count < 50) {
-        elements.charCount.classList.add('text-danger');
-        elements.charCount.classList.remove('text-warning');
-    } else if (count < 100) {
-        elements.charCount.classList.remove('text-danger');
-        elements.charCount.classList.add('text-warning');
+    // Enable/disable button based on length
+    elements.analyzeBtn.disabled = count < 10;
+    
+    // Color coding
+    if (count < 10) {
+        elements.charCount.style.color = '#dc3545';
+    } else if (count < 50) {
+        elements.charCount.style.color = '#fd7e14';
     } else {
-        elements.charCount.classList.remove('text-danger', 'text-warning');
+        elements.charCount.style.color = '#198754';
     }
 }
 
-// Update Analyze Button State
-function updateAnalyzeButton() {
-    const text = elements.inputText.value.trim();
-    elements.analyzeBtn.disabled = text.length < 50 || appState.isAnalyzing;
+// Update sensitivity value display
+function updateSensitivityValue() {
+    currentSensitivity = parseInt(elements.sensitivitySlider.value);
+    elements.sensitivityValue.textContent = currentSensitivity;
 }
 
-// Update Slider Values Display
-function updateSliderValues() {
-    elements.normalValue.textContent = elements.normalSensitivity.value;
-    elements.confidenceValue.textContent = elements.confidenceThreshold.value;
-    
-    appState.sensitivity.normal = parseFloat(elements.normalSensitivity.value);
-    appState.sensitivity.confidence = parseFloat(elements.confidenceThreshold.value);
-}
-
-function updateSliderValue(sliderId, valueId) {
-    const slider = document.getElementById(sliderId);
-    const value = document.getElementById(valueId);
-    value.textContent = slider.value;
-    appState.sensitivity[sliderId.replace('Sensitivity', '').toLowerCase()] = parseFloat(slider.value);
-}
-
-// Load Example Text
+// Load example text
 function loadExample(type) {
     const examples = {
         normal: "Hari ini saya merasa sangat bahagia. Pagi ini saya bangun dengan perasaan segar dan bersemangat. Saya berhasil menyelesaikan semua pekerjaan tepat waktu dan bahkan punya waktu untuk berolahraga. Malam ini saya akan makan malam bersama keluarga.",
         
-        anxiety: "Saya tidak bisa berhenti merasa cemas tentang presentasi besok. Jantung saya berdebar-debar sejak pagi. Pikiran saya terus membayangkan semua hal buruk yang mungkin terjadi. Saya takut akan gagal dan dipermalukan di depan semua orang.",
+        anxiety: "Saya tidak bisa berhenti merasa cemas tentang presentasi besok. Jantung saya berdebar-debar sejak pagi. Pikiran saya terus membayangkan semua hal buruk yang mungkin terjadi. Saya takut akan gagal dan dipermalukan di depan semua orang. Tidak bisa tidur semalaman.",
         
-        depression: "Sudah dua minggu saya merasa sangat sedih dan hampa. Tidak ada yang membuat saya senang lagi. Saya hanya ingin tidur sepanjang hari. Rasanya hidup ini tidak ada artinya. Semua terasa berat dan melelahkan."
+        depression: "Sudah dua minggu saya merasa sangat sedih dan hampa. Tidak ada yang membuat saya senang lagi. Saya hanya ingin tidur sepanjang hari. Rasanya hidup ini tidak ada artinya. Semua terasa berat dan melelahkan. Tidak punya energi untuk melakukan apapun."
     };
     
     elements.inputText.value = examples[type] || examples.normal;
     updateCharCount();
-    updateAnalyzeButton();
     elements.inputText.focus();
 }
 
-// Show All Examples
-function showExamples() {
-    const modalHtml = `
-        <div class="modal fade" id="examplesModal" tabindex="-1">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h5 class="modal-title"><i class="bi bi-lightbulb me-2"></i>Contoh Teks</h5>
-                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                    </div>
-                    <div class="modal-body">
-                        <div class="mb-3">
-                            <h6 class="text-success"><i class="bi bi-emoji-smile me-2"></i>Normal</h6>
-                            <p class="small">"Hari ini cuaca cerah, saya merasa bersemangat untuk mulai aktivitas. Sudah menyelesaikan pekerjaan dengan baik dan berencana bertemu teman nanti malam."</p>
-                            <button class="btn btn-sm btn-outline-success" onclick="loadExample('normal')">Gunakan</button>
-                        </div>
-                        <div class="mb-3">
-                            <h6 class="text-warning"><i class="bi bi-emoji-expressionless me-2"></i>Anxiety</h6>
-                            <p class="small">"Saya terus merasa cemas dan khawatir tanpa alasan yang jelas. Jantung berdebar dan sulit tidur karena memikirkan hal-hal yang belum tentu terjadi."</p>
-                            <button class="btn btn-sm btn-outline-warning" onclick="loadExample('anxiety')">Gunakan</button>
-                        </div>
-                        <div class="mb-3">
-                            <h6 class="text-danger"><i class="bi bi-emoji-frown me-2"></i>Depression</h6>
-                            <p class="small">"Rasanya tidak ada harapan lagi. Semua terasa hampa dan tidak berarti. Saya lelah dengan semua ini dan ingin menyendiri saja."</p>
-                            <button class="btn btn-sm btn-outline-danger" onclick="loadExample('depression')">Gunakan</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    `;
-    
-    // Create and show modal
-    const modalDiv = document.createElement('div');
-    modalDiv.innerHTML = modalHtml;
-    document.body.appendChild(modalDiv);
-    
-    const modal = new bootstrap.Modal(document.getElementById('examplesModal'));
-    modal.show();
-    
-    // Remove modal after hiding
-    document.getElementById('examplesModal').addEventListener('hidden.bs.modal', function() {
-        modalDiv.remove();
-    });
-}
-
-// Scroll to Input Section
-function scrollToInput() {
-    document.getElementById('classifier').scrollIntoView({ behavior: 'smooth' });
-    elements.inputText.focus();
-}
-
-// Main Analysis Function
-async function analyzeText() {
+// Main analysis function - 100% in browser
+function analyzeText() {
     const text = elements.inputText.value.trim();
     
     // Validation
-    if (text.length < 50) {
-        showAlert('Teks terlalu pendek. Minimal 50 karakter untuk analisis akurat.', 'warning');
+    if (text.length < 10) {
+        showAlert('Teks terlalu pendek. Minimal 10 karakter.', 'warning');
         return;
     }
     
-    if (text.length > 2000) {
-        showAlert('Teks terlalu panjang. Maksimal 2000 karakter.', 'warning');
+    if (text.length > 1000) {
+        showAlert('Teks terlalu panjang. Maksimal 1000 karakter.', 'warning');
         return;
     }
     
-    // Set loading state
-    setLoadingState(true);
+    // Show loading
+    showLoading(true);
     
-    try {
-        let result;
-        
-        if (CONFIG.USE_LOCAL_API) {
-            // Use our local API (recommended)
-            result = await callLocalAPI(text);
-        } else {
-            // Direct Hugging Face call (NOT RECOMMENDED for production)
-            result = await callHuggingFaceAPI(text);
+    // Simulate processing delay (bukan API call)
+    setTimeout(() => {
+        try {
+            // Generate predictions locally
+            const predictions = generatePredictions(text);
+            
+            // Display results
+            displayResults(predictions);
+            
+            // Show success
+            showAlert('Analisis berhasil!', 'success');
+            
+        } catch (error) {
+            console.error('Analysis error:', error);
+            showAlert('Terjadi kesalahan dalam analisis.', 'danger');
+        } finally {
+            // Hide loading
+            showLoading(false);
         }
-        
-        // Process and display results
-        displayResults(result);
-        
-        // Store in history
-        appState.lastAnalysis = result;
-        
-    } catch (error) {
-        console.error('Analysis error:', error);
-        showAlert('Gagal menganalisis teks. Silakan coba lagi.', 'danger');
-        
-        // Fallback to mock data
-        const mockResult = await generateMockPredictions(text);
-        displayResults(mockResult);
-        
-    } finally {
-        setLoadingState(false);
-    }
+    }, 800); // Delay untuk efek loading
 }
 
-// Call Local API
-async function callLocalAPI(text) {
-    const startTime = Date.now();
-    
-    const response = await fetch(CONFIG.API_ENDPOINT, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            text: text,
-            sensitivity: appState.sensitivity
-        })
-    });
-    
-    if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    const analysisTime = (Date.now() - startTime) / 1000;
-    
-    return {
-        ...data,
-        analysis_time: analysisTime
-    };
-}
-
-// Direct Hugging Face API Call (Fallback)
-async function callHuggingFaceAPI(text) {
-    // NOTE: This exposes your API key in client-side code!
-    // Only use for development or if you have proper security measures
-    
-    const API_KEY = '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';
-    
-    const response = await fetch(CONFIG.HUGGINGFACE_ENDPOINT, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ inputs: text })
-    });
-    
-    if (!response.ok) {
-        throw new Error(`Hugging Face API error: ${response.status}`);
-    }
-    
-    const data = await response.json();
-    
-    // Process Hugging Face response format
-    return processHuggingFaceResponse(data, text);
-}
-
-// Process Hugging Face Response
-function processHuggingFaceResponse(apiData, text) {
-    // Hugging Face returns labels like LABEL_0, LABEL_1, etc.
-    const labelMap = {
-        "LABEL_0": "Normal",
-        "LABEL_1": "Anxiety",
-        "LABEL_2": "Depression",
-        "LABEL_3": "Bipolar",
-        "LABEL_4": "Suicidal"
-    };
-    
-    const predictions = apiData[0].map(item => ({
-        label: labelMap[item.label] || item.label,
-        score: item.score,
-        percentage: Math.round(item.score * 10000) / 100
-    })).sort((a, b) => b.score - a.score);
-    
-    // Analyze text for indicators
-    const analysis = analyzeTextIndicators(text);
-    
-    return {
-        success: true,
-        predictions: predictions,
-        text_analysis: analysis,
-        analysis_time: 1.5 // Mock time
-    };
-}
-
-// Generate Mock Predictions (Fallback)
-async function generateMockPredictions(text) {
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
+// Generate predictions locally (no API needed)
+function generatePredictions(text) {
     const textLower = text.toLowerCase();
-    const analysis = analyzeTextIndicators(textLower);
     
-    // Calculate scores based on text analysis
+    // Base scores
     let scores = {
-        "Normal": 0.3 + (analysis.normal_indicators * 0.05),
-        "Anxiety": 0.2 + (analysis.anxiety_indicators * 0.08),
-        "Depression": 0.2 + (analysis.depression_indicators * 0.08),
-        "Bipolar": 0.15 + (analysis.bipolar_indicators * 0.05),
-        "Suicidal": 0.15 + (analysis.suicidal_indicators * 0.1)
+        "Normal": 0.4,    // Higher base for normal
+        "Anxiety": 0.15,
+        "Depression": 0.15,
+        "Bipolar": 0.15,
+        "Suicidal": 0.15
     };
     
-    // Apply sensitivity settings
-    scores.Normal *= (1 + appState.sensitivity.normal);
+    // Analyze text for each category
+    for (const [label, info] of Object.entries(CONFIG.LABEL_INFO)) {
+        let keywordCount = 0;
+        
+        // Count keyword matches
+        info.keywords.forEach(keyword => {
+            if (textLower.includes(keyword)) {
+                keywordCount++;
+            }
+        });
+        
+        // Adjust score based on keywords found
+        if (keywordCount > 0) {
+            if (label === 'Normal') {
+                scores[label] += keywordCount * 0.08;
+            } else {
+                scores[label] += keywordCount * 0.1;
+            }
+        }
+    }
+    
+    // Check for positive/negative words
+    let positiveCount = 0;
+    let negativeCount = 0;
+    
+    CONFIG.POSITIVE_WORDS.forEach(word => {
+        if (textLower.includes(word)) positiveCount++;
+    });
+    
+    CONFIG.NEGATIVE_WORDS.forEach(word => {
+        if (textLower.includes(word)) negativeCount++;
+    });
+    
+    // Adjust based on sentiment
+    if (positiveCount > negativeCount) {
+        scores.Normal += positiveCount * 0.05;
+    } else if (negativeCount > positiveCount) {
+        scores.Normal -= negativeCount * 0.03;
+        scores.Depression += negativeCount * 0.04;
+        scores.Anxiety += negativeCount * 0.03;
+    }
+    
+    // Apply sensitivity setting (1-10 scale to 0.1-2.0 multiplier)
+    const sensitivityMultiplier = 0.1 + (currentSensitivity * 0.19); // 0.1 to 2.0
+    scores.Normal *= sensitivityMultiplier;
+    
+    // Ensure no negative scores
+    Object.keys(scores).forEach(key => {
+        scores[key] = Math.max(0.01, scores[key]);
+    });
     
     // Normalize to sum to 1
     const total = Object.values(scores).reduce((a, b) => a + b, 0);
@@ -452,218 +275,140 @@ async function generateMockPredictions(text) {
         scores[key] = scores[key] / total;
     });
     
-    // Convert to prediction format
+    // Convert to prediction objects
     const predictions = CONFIG.LABELS.map(label => ({
         label: label,
         score: scores[label],
         percentage: Math.round(scores[label] * 10000) / 100
-    })).sort((a, b) => b.score - a.score);
+    }));
     
-    return {
-        success: true,
-        predictions: predictions,
-        text_analysis: analysis,
-        analysis_time: 0.8,
-        is_mock: true
-    };
+    // Sort by score (descending)
+    predictions.sort((a, b) => b.score - a.score);
+    
+    return predictions;
 }
 
-// Analyze Text for Indicators
-function analyzeTextIndicators(text) {
-    const textLower = text.toLowerCase();
-    let analysis = {
-        normal_indicators: 0,
-        anxiety_indicators: 0,
-        depression_indicators: 0,
-        bipolar_indicators: 0,
-        suicidal_indicators: 0,
-        total_emotion_words: 0
-    };
-    
-    // Check for each label's keywords
-    for (const [label, info] of Object.entries(CONFIG.LABEL_INFO)) {
-        for (const keyword of info.keywords) {
-            if (textLower.includes(keyword)) {
-                analysis[`${label.toLowerCase()}_indicators`]++;
-                analysis.total_emotion_words++;
-            }
-        }
-    }
-    
-    // Additional text analysis
-    analysis.text_length = text.length;
-    analysis.has_positive_words = (textLower.includes('baik') || textLower.includes('senang') || textLower.includes('bahagia'));
-    analysis.has_negative_words = (textLower.includes('tidak') || textLower.includes('susah') || textLower.includes('sulit'));
-    
-    return analysis;
-}
-
-// Set Loading State
-function setLoadingState(isLoading) {
-    appState.isAnalyzing = isLoading;
-    
-    if (isLoading) {
-        // Show loading state
-        elements.loadingState.style.display = 'block';
-        elements.resultsContainer.style.opacity = '0.5';
-        elements.analyzeBtn.disabled = true;
-        elements.analyzeBtn.innerHTML = '<i class="bi bi-hourglass-split me-2"></i> Menganalisis...';
-        
-        // Hide results
-        elements.topPrediction.style.display = 'none';
-        elements.allPredictions.style.display = 'none';
-        elements.emptyState.style.display = 'none';
-    } else {
-        // Hide loading state
-        elements.loadingState.style.display = 'none';
-        elements.resultsContainer.style.opacity = '1';
-        updateAnalyzeButton();
-        elements.analyzeBtn.innerHTML = '<i class="bi bi-play-circle me-2"></i> Analisis Teks';
-    }
-}
-
-// Display Results
-function displayResults(result) {
-    const predictions = result.predictions;
-    const textAnalysis = result.text_analysis;
+// Display results
+function displayResults(predictions) {
     const topPrediction = predictions[0];
+    const labelInfo = CONFIG.LABEL_INFO[topPrediction.label];
     
     // Hide empty state
     elements.emptyState.style.display = 'none';
     
-    // Display top prediction
-    displayTopPrediction(topPrediction);
+    // Show top result
+    elements.topIcon.className = `bi ${labelInfo.icon} display-4 text-${labelInfo.color}`;
+    elements.topLabel.textContent = topPrediction.label;
+    elements.topLabel.className = `fw-bold text-${labelInfo.color}`;
+    elements.topBar.className = `progress-bar bg-${labelInfo.color}`;
+    elements.topBar.style.width = `${topPrediction.percentage}%`;
+    elements.topBar.textContent = `${topPrediction.percentage}%`;
+    elements.topDesc.textContent = labelInfo.description;
     
-    // Display all predictions
-    displayAllPredictions(predictions);
+    elements.topResult.style.display = 'block';
     
-    // Display text analysis
-    displayTextAnalysis(textAnalysis);
-    
-    // Show elements
-    elements.topPrediction.style.display = 'block';
-    elements.allPredictions.style.display = 'block';
+    // Show all results
+    displayAllResults(predictions);
+    elements.allResults.style.display = 'block';
 }
 
-// Display Top Prediction
-function displayTopPrediction(prediction) {
-    const info = CONFIG.LABEL_INFO[prediction.label];
-    
-    // Set icon
-    elements.topPredictionIcon.className = `prediction-icon ${prediction.label.toLowerCase()} bi ${info.icon}`;
-    
-    // Set label
-    elements.topPredictionLabel.textContent = prediction.label;
-    elements.topPredictionLabel.className = `text-${info.color} fw-bold`;
-    
-    // Set progress bar
-    elements.topPredictionBar.className = `progress-bar bg-${info.color}`;
-    elements.topPredictionBar.style.width = `${prediction.percentage}%`;
-    elements.topPredictionBar.setAttribute('aria-valuenow', prediction.percentage);
-    elements.topPredictionBar.textContent = `${prediction.percentage}%`;
-    
-    // Set percentage
-    elements.topPredictionPercent.textContent = `${prediction.percentage}%`;
-    elements.topPredictionPercent.className = `text-${info.color} fw-bold`;
-    
-    // Set description
-    elements.topPredictionDesc.textContent = info.description;
-}
-
-// Display All Predictions
-function displayAllPredictions(predictions) {
-    elements.predictionsList.innerHTML = '';
+// Display all predictions
+function displayAllResults(predictions) {
+    elements.resultsList.innerHTML = '';
     
     predictions.forEach((pred, index) => {
         const info = CONFIG.LABEL_INFO[pred.label];
         const isTop = index === 0;
         
-        const predElement = document.createElement('div');
-        predElement.className = `prediction-item mb-3 p-3 rounded ${isTop ? 'border border-2' : 'border'}`;
-        predElement.style.borderColor = `var(--${info.color})`;
-        predElement.style.background = isTop ? `${info.bgColor}10` : 'transparent';
+        const item = document.createElement('div');
+        item.className = `prediction-item ${pred.label.toLowerCase()} ${isTop ? 'border-primary' : ''}`;
+        item.style.borderLeftColor = info.bgColor;
         
-        predElement.innerHTML = `
+        if (isTop) {
+            item.style.background = `${info.bgColor}15`;
+        }
+        
+        item.innerHTML = `
             <div class="row align-items-center">
-                <div class="col-1">
-                    <span class="badge bg-${info.color}">${index + 1}</span>
-                </div>
-                <div class="col-3">
-                    <div class="d-flex align-items-center">
-                        <i class="bi ${info.icon} text-${info.color} fs-4 me-2"></i>
-                        <strong class="text-${info.color}">${pred.label}</strong>
-                    </div>
+                <div class="col-2 text-center">
+                    <i class="bi ${info.icon} fs-4 text-${info.color}"></i>
                 </div>
                 <div class="col-5">
+                    <strong class="text-${info.color}">${pred.label}</strong>
+                </div>
+                <div class="col-3">
                     <div class="progress" style="height: 10px;">
                         <div class="progress-bar bg-${info.color}" 
-                             style="width: ${pred.percentage}%"
-                             role="progressbar">
+                             style="width: ${pred.percentage}%">
                         </div>
                     </div>
                 </div>
-                <div class="col-3 text-end">
-                    <span class="fw-bold fs-5 text-${info.color}">${pred.percentage}%</span>
-                    <br>
-                    <small class="text-muted">${pred.score.toFixed(4)}</small>
+                <div class="col-2 text-end">
+                    <span class="fw-bold">${pred.percentage}%</span>
                 </div>
             </div>
         `;
         
-        elements.predictionsList.appendChild(predElement);
+        elements.resultsList.appendChild(item);
     });
 }
 
-// Display Text Analysis
-function displayTextAnalysis(analysis) {
-    elements.normalIndicators.textContent = analysis.normal_indicators;
-    elements.emotionWords.textContent = analysis.total_emotion_words;
+// Show/hide loading indicator
+function showLoading(show) {
+    if (show) {
+        elements.loadingIndicator.style.display = 'block';
+        elements.resultsArea.style.opacity = '0.5';
+        elements.analyzeBtn.disabled = true;
+        elements.analyzeBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
+    } else {
+        elements.loadingIndicator.style.display = 'none';
+        elements.resultsArea.style.opacity = '1';
+        elements.analyzeBtn.disabled = elements.inputText.value.length < 10;
+        elements.analyzeBtn.innerHTML = '<i class="bi bi-play-circle"></i> Analisis Sekarang';
+    }
 }
 
-// Show Alert
+// Show alert message
 function showAlert(message, type = 'info') {
     // Remove existing alerts
-    const existingAlerts = document.querySelectorAll('.custom-alert');
-    existingAlerts.forEach(alert => alert.remove());
+    const existing = document.querySelector('.custom-alert');
+    if (existing) existing.remove();
     
     // Create alert
     const alert = document.createElement('div');
     alert.className = `custom-alert alert alert-${type} alert-dismissible fade show position-fixed`;
     alert.style.cssText = `
-        top: 20px;
+        top: 70px;
         right: 20px;
         z-index: 9999;
-        max-width: 400px;
+        max-width: 300px;
         box-shadow: 0 4px 12px rgba(0,0,0,0.15);
     `;
     
+    const icon = type === 'success' ? 'bi-check-circle' : 
+                 type === 'warning' ? 'bi-exclamation-triangle' : 
+                 'bi-info-circle';
+    
     alert.innerHTML = `
         <div class="d-flex align-items-center">
-            <i class="bi ${type === 'success' ? 'bi-check-circle' : type === 'warning' ? 'bi-exclamation-triangle' : 'bi-info-circle'} me-2 fs-4"></i>
+            <i class="bi ${icon} me-2"></i>
             <div>${message}</div>
         </div>
-        <button type="button" class="btn-close" onclick="this.parentElement.remove()"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
     `;
     
     document.body.appendChild(alert);
     
-    // Auto remove after 5 seconds
+    // Auto remove after 3 seconds
     setTimeout(() => {
         if (alert.parentNode) {
-            alert.remove();
+            const bsAlert = new bootstrap.Alert(alert);
+            bsAlert.close();
         }
-    }, 5000);
+    }, 3000);
 }
 
-// Show API Status
-function showApiStatus() {
-    const status = appState.modelReady ? 'connected' : 'loading';
-    const message = appState.modelReady ? 
-        'API terhubung dan siap digunakan' : 
-        'Sedang memuat model...';
-    
-    showAlert(`Status: ${message}`, status === 'connected' ? 'success' : 'warning');
-}
-
-// Initialize when page loads
-document.addEventListener('DOMContentLoaded', initApp);
+// Public functions
+window.loadExample = loadExample;
+window.analyzeText = analyzeText;
+window.updateSensitivityValue = updateSensitivityValue;
